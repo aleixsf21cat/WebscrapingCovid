@@ -1,0 +1,155 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Mar 23 21:51:42 2021
+
+@author: Lluis
+@author: Aleix
+"""
+
+
+from datetime import datetime
+from bs4 import BeautifulSoup
+import requests
+import time
+import re
+import csv
+
+def log_open(log_file):
+    logfile = open(log_file_name, 'w')
+    return logfile
+
+def log_close(log_file):
+    log_file.close()
+    return
+    
+def log_print(log_file, log_str):
+    # get time stamp
+    dateTimeObj = datetime.now()
+    # print log
+    print(f'{dateTimeObj} - {log_str}', file=log_file)
+    return
+
+# set headers for requests
+def set_headers():
+    headers = {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,\ */*;q=0.8",
+        "Accept-Encoding": "gzip, deflate, sdch, br",
+        "Accept-Language": "ca-ES,en-US,en;q=0.8",
+        "Cache-Control": "no-cache",
+        "dnt": "1",
+        "Pragma": "no-cache",
+        "Upgrade-Insecure-Requests": "1",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_3) AppleWebKit/5\ 37.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36"
+        }
+    return headers
+
+# do_requests
+def do_request(url, headers, timesleep, timeout, retries):
+    log_print(log, "do_request - Downloading: " + url)
+    download = False
+    count = retries
+    while (download == False):
+        try:
+            page = requests.get(url, headers=headers, timeout=10)
+        except requests.exceptions.Timeout:
+            log_print(log, "Requests - requests.exceptions.Timeout")
+            time.sleep(timesleep)
+        except requests.exceptions.RequestException:
+            log_print(log, "Requests - equests.exceptions.RequestException")
+            time.sleep(timesleep)
+        if page != None:
+            download = True
+            count -= 1
+        if count == 0:
+            beark
+    return page
+  
+if __name__ == "__main__":
+  
+    # Inicialització log
+    log_file_name = "scraper.log"
+    log = log_open(log_file_name)
+    log_print(log, "Inici")
+
+    # Inicialització variables
+    log_print(log, "Incialitzant varibles globals - Inici")
+    url = "https://dadescovid.cat/municipi?tipus_territori=territori"
+    log_print(log, "url: " + url)
+    # requests parameters
+    timeout = 30
+    log_print(log, "timeout: " + str(timeout))
+    timesleep = 3
+    log_print(log, "timesleep: " + str(timesleep))
+    retries = 5
+    log_print(log, "retries: " + str(retries))
+    log_print(log, "Incialitzant varibles globals - Fi")
+    
+    # set headers
+    headers = set_headers()
+
+    # request
+    log_print(log, "requests - Inici")
+    
+    # Requests controlant el timeout = 10 segons
+    page = do_request(url, headers, timesleep, timeout, retries)
+    log_print(log, "requests - Fi")
+    log_print(log, "Status Code: " + str(page.status_code))
+
+    # soup
+    soup = BeautifulSoup(page.content, "html.parser")
+    log_print(log, "soup.name: " + str(soup.name))
+    
+    # log del contingut
+    log_print(log, "sop.prettify()")
+    log_print(log, soup.prettify())    
+    
+    # Recerca de taules.
+    log_print(log, "Recerca de tautes")
+    for table in soup.find_all('table'):
+        log_print(log, table.get_text())
+
+    #for tr in soup.find_all('tr')[2:]:
+    #    tds = tr.find_all('td')
+    #    print(tds[0].get_text())
+    #    print(tds[1].get_text())
+        
+    table = soup.find("table", attrs={"class": "table center"})
+    #print(table)
+    headings = []
+    #for th in table.find_all("th"):
+    #    for td in th.find_all("td"):
+    #        headings.append(td.text.replace('\n', '').strip())
+    #print(headings)
+    log_print(log, "headings")
+    headings = []
+    for ths in table.find_all("th"):
+        log_print(log, "ths.get_text(): " + ths.text.replace('\n', ' ').strip())
+        headings.append(ths.text.replace('\n', ' ').strip())
+    
+    log_print(log, "headings-summary: ")
+    log_print(log, headings)
+    
+    table_data = []
+    for trs in table.tbody.find_all("tr"):
+        t_row = []
+        for tds in trs.find_all("td"):
+            log_print(log, "tds")
+            element = re.sub("(\xa0)|(\n)|,","",tds.text)
+            t_row.append(element)
+        table_data.append(t_row)
+    
+    log_print(log, "table_data: ")
+    log_print(log, table_data)
+    
+    log_print(log, "csv_output: ")
+    outfile = open("table_data.csv","w",newline='')
+    writer = csv.writer(outfile)
+    writer.writerow(headings)
+    for row in table_data:
+        log_print(log, row)
+        writer.writerow(row)
+        
+    # Finalització log
+    log_print(log, "Final")
+    log_close(log)
